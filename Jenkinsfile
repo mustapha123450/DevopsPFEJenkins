@@ -11,6 +11,7 @@ pipeline {
     }
     
     tools {
+        // Assurez-vous que le plugin NodeJS est installé et configuré avec ce nom
         nodejs 'NodeJS-18'
     }
     
@@ -18,7 +19,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo '📦 Code récupéré'
+                echo '📦 Code récupéré avec succès'
             }
         }
         
@@ -32,13 +33,14 @@ pipeline {
         stage('Lint') {
             steps {
                 sh 'npm run lint || true'
+                echo '✅ Linting terminé'
             }
         }
         
         stage('Test') {
             steps {
                 sh 'npm test'
-                echo '🧪 Tests OK'
+                echo '🧪 Tests passés avec succès'
             }
         }
         
@@ -48,7 +50,7 @@ pipeline {
                     docker.build("${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:${IMAGE_TAG}")
                     docker.build("${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:latest")
                 }
-                echo '🐳 Images construites'
+                echo '🐳 Images Docker construites'
             }
         }
         
@@ -92,10 +94,10 @@ pipeline {
                         echo '📊 Pods :'
                         kubectl get pods -n ${K8S_NAMESPACE}
                         
-                        echo '\n📊 Services :'
+                        echo '\\n📊 Services :'
                         kubectl get services -n ${K8S_NAMESPACE}
                         
-                        echo '\n📊 Déploiement :'
+                        echo '\\n📊 Déploiement :'
                         kubectl describe deployment rest-api-deployment -n ${K8S_NAMESPACE} | grep -E "Replicas|Image"
                     """
                 }
