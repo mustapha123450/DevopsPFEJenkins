@@ -80,7 +80,7 @@ pipeline {
   
   post {
     success {
-      echo "✅ Déploiement réussi ! Image: ${REGISTRY_PATH}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+      echo "✅ Déploiement réussssi ! Image: ${REGISTRY_PATH}/${DOCKER_IMAGE}:${DOCKER_TAG}"
     }
     failure {
       echo "❌ Le déploiement a échoué. Vérifiez les logs ci-dessus."
