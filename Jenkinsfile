@@ -71,7 +71,7 @@ pipeline {
                 withKubeConfig([credentialsId: 'kubeconfig']) {
                     sh """
                         # Appliquer la configuration (créer si n'existe pas)
-                        kubectl apply -f k8s/all-in-one.yaml -n ${K8S_NAMESPACE} || true
+                        kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE} || true
                         
                         # Mettre à jour l'image
                         kubectl set image deployment/rest-api-deployment \
