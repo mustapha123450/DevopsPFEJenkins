@@ -11,7 +11,6 @@ pipeline {
     }
     
     tools {
-        // Assurez-vous que le plugin NodeJS est installé et configuré avec ce nom
         nodejs 'NodeJS-18'
     }
     
@@ -69,19 +68,32 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig']) {
-                    sh """
-                        # Appliquer la configuration (créer si n'existe pas)
-                        kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE} || true
-                        
-                        # Mettre à jour l'image
-                        kubectl set image deployment/rest-api-deployment \
-                            rest-api=${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:${IMAGE_TAG} \
-                            -n ${K8S_NAMESPACE}
-                        
-                        # Attendre le déploiement
-                        kubectl rollout status deployment/rest-api-deployment \
-                            -n ${K8S_NAMESPACE} --timeout=5m
-                    """
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh """
+                            # Créer le secret pour ghcr.io
+                            kubectl create secret docker-registry ghcr-secret \\
+                                --docker-server=${DOCKER_REGISTRY} \\
+                                --docker-username=${REPO_OWNER} \\
+                                --docker-password=${GITHUB_TOKEN} \\
+                                --namespace=${K8S_NAMESPACE} \\
+                                --dry-run=client -o yaml | kubectl apply -f -
+                            
+                            # Ajouter imagePullSecrets au déploiement
+                            kubectl patch deployment rest-api-deployment -n ${K8S_NAMESPACE} --type='json' -p='[{"op": "add", "path": "/spec/template/spec/imagePullSecrets", "value": [{"name": "ghcr-secret"}]}]' || true
+                            
+                            # Appliquer la configuration
+                            kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE} || true
+                            
+                            # Mettre à jour l'image
+                            kubectl set image deployment/rest-api-deployment \\
+                                rest-api=${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:${IMAGE_TAG} \\
+                                -n ${K8S_NAMESPACE}
+                            
+                            # Attendre le déploiement
+                            kubectl rollout status deployment/rest-api-deployment \\
+                                -n ${K8S_NAMESPACE} --timeout=5m
+                        """
+                    }
                 }
                 echo '🚀 Déploiement effectué'
             }
