@@ -70,7 +70,7 @@ pipeline {
                 withKubeConfig([credentialsId: 'kubeconfig']) {
                     withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                         sh """
-                            # Créer le secret pour ghcr.io
+                            # 1️⃣ Créer le secret pour ghcr.io (nécessaire pour les images privées)
                             kubectl create secret docker-registry ghcr-secret \\
                                 --docker-server=${DOCKER_REGISTRY} \\
                                 --docker-username=${REPO_OWNER} \\
@@ -78,18 +78,15 @@ pipeline {
                                 --namespace=${K8S_NAMESPACE} \\
                                 --dry-run=client -o yaml | kubectl apply -f -
                             
-                            # Ajouter imagePullSecrets au déploiement
-                            kubectl patch deployment rest-api-deployment -n ${K8S_NAMESPACE} --type='json' -p='[{"op": "add", "path": "/spec/template/spec/imagePullSecrets", "value": [{"name": "ghcr-secret"}]}]' || true
+                            # 2️⃣ ✅ APPLIQUER TOUTE LA CONFIGURATION (POSTGRESQL + API)
+                            kubectl apply -f k8s/all-in-one.yaml -n ${K8S_NAMESPACE}
                             
-                            # Appliquer la configuration
-                            kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE} || true
-                            
-                            # Mettre à jour l'image
+                            # 3️⃣ Mettre à jour l'image de l'API avec le nouveau tag
                             kubectl set image deployment/rest-api-deployment \\
                                 rest-api=${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:${IMAGE_TAG} \\
                                 -n ${K8S_NAMESPACE}
                             
-                            # Attendre le déploiement
+                            # 4️⃣ Attendre que le déploiement soit terminé
                             kubectl rollout status deployment/rest-api-deployment \\
                                 -n ${K8S_NAMESPACE} --timeout=5m
                         """
@@ -109,8 +106,11 @@ pipeline {
                         echo '\\n📊 Services :'
                         kubectl get services -n ${K8S_NAMESPACE}
                         
-                        echo '\\n📊 Déploiement :'
+                        echo '\\n📊 Déploiement API :'
                         kubectl describe deployment rest-api-deployment -n ${K8S_NAMESPACE} | grep -E "Replicas|Image"
+                        
+                        echo '\\n📊 PostgreSQL :'
+                        kubectl get pods -n ${K8S_NAMESPACE} | grep postgres
                     """
                 }
                 echo '✅ Déploiement vérifié'
@@ -122,9 +122,11 @@ pipeline {
         success {
             echo "🎉 Pipeline terminé avec succès !"
             echo "Image: ${DOCKER_REGISTRY}/${REPO_OWNER}/${REPO_NAME}/${DOCKER_IMAGE}:${IMAGE_TAG}"
+            echo "📌 Pour tester : kubectl port-forward -n production service/rest-api-service 8080:80"
         }
         failure {
             echo "❌ Le pipeline a échoué. Vérifiez les logs ci-dessus."
+            echo "🔍 Conseil: kubectl describe pods -n production | grep -A 10 Events"
         }
         always {
             echo "📝 Pipeline terminé à ${new Date()}"

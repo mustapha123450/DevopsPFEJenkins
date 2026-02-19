@@ -132,7 +132,7 @@ spec:
     spec:
       containers:
       - name: rest-api
-        image: ghcr.io/mustapha123450/devopspfe1/my-rest-api:latest
+        image: ghcr.io/mustapha123450/devopspfejenkins/my-rest-api:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
